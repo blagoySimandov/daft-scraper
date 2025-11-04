@@ -1,6 +1,16 @@
+import dotenv from "dotenv";
+
+dotenv.config();
+
 export const BROWSER_CONFIG = {
   HEADLESS: true,
-  ARGS: ["--no-sandbox", "--disable-setuid-sandbox"] as const,
+  ARGS: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-web-security",
+    "--disable-features=IsolateOrigins,site-per-process",
+  ] as const,
 } as const;
 
 export const USER_AGENTS = {
@@ -12,14 +22,26 @@ export const USER_AGENTS = {
 
 export const TIMEOUTS = {
   PAGE_LOAD: 60000,
-  NETWORK_IDLE: 30000,
+  NETWORK_IDLE: 10000,
   CLOUDFLARE_WAIT: 3000,
   MOUSE_MOVE_DELAY: 100,
+  CLOUDFLARE_CHECKBOX_WAIT: 10000,
+  AFTER_CHECKBOX_CLICK: 5000,
 } as const;
 
 export const ANTI_BOT = {
   MOUSE_MOVEMENTS: 20,
   CLOUDFLARE_COOKIE: "cf_clearance",
+} as const;
+
+export const CAPSOLVER = {
+  API_KEY: process.env.CAPSOLVER_API_KEY || "",
+  CREATE_TASK_URL: "https://api.capsolver.com/createTask",
+  GET_RESULT_URL: "https://api.capsolver.com/getTaskResult",
+  TASK_TYPE: "AntiCloudflareTask",
+  PROXY: process.env.PROXY,
+  POLL_INTERVAL_MS: 1000,
+  MAX_POLL_TIME_MS: 120000,
 } as const;
 
 export const SCRAPING = {

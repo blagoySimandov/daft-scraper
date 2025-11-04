@@ -8,3 +8,4 @@ apify_storage
 !.actor/**/*.json
 .DS_Store
 *.log
+.env

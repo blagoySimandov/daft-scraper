@@ -1,14 +1,11 @@
-import puppeteer, { Page } from "puppeteer";
 import axios from "axios";
 import { log } from "apify";
 import {
-  BROWSER_CONFIG,
-  USER_AGENTS,
-  TIMEOUTS,
   ANTI_BOT,
   HTTP_HEADERS,
   DAFT,
   SCRAPING,
+  CAPSOLVER,
 } from "../config";
 import { parseHydrationData } from "../utils";
 import type { RawListingsData, RawPropertyData } from "../models";
@@ -37,28 +34,90 @@ export class CrawlerService {
     return `${DAFT.DOMAIN}/property-for-${saleOrRent}${area}?adState=published&terms=${encodeURIComponent(searchTerm)}`;
   }
 
-  private async simulateMouseMovement(page: Page): Promise<void> {
-    log.debug("Simulating mouse movement");
-    for (let i = 0; i < ANTI_BOT.MOUSE_MOVEMENTS; i++) {
-      const x = Math.floor(Math.random() * 800) + 100;
-      const y = Math.floor(Math.random() * 600) + 100;
-      await page.mouse.move(x, y);
-      await new Promise((resolve) =>
-        setTimeout(resolve, TIMEOUTS.MOUSE_MOVE_DELAY),
-      );
+  private async createCapSolverTask(websiteURL: string): Promise<string> {
+    log.debug(`Creating CapSolver AntiCloudflareTask for ${websiteURL}`);
+    const response = await axios.post(CAPSOLVER.CREATE_TASK_URL, {
+      clientKey: CAPSOLVER.API_KEY,
+      task: {
+        type: CAPSOLVER.TASK_TYPE,
+        websiteURL,
+        proxy: CAPSOLVER.PROXY,
+      },
+    });
+
+    if (response.data.errorId !== 0) {
+      throw new Error(`CapSolver error: ${response.data.errorDescription}`);
+    }
+
+    log.debug(`CapSolver task created: ${response.data.taskId}`);
+    return response.data.taskId;
+  }
+
+  private async getCapSolverResult(taskId: string): Promise<string> {
+    log.debug(`Polling CapSolver for cf_clearance cookie: ${taskId}`);
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < CAPSOLVER.MAX_POLL_TIME_MS) {
+      const response = await axios.post(CAPSOLVER.GET_RESULT_URL, {
+        clientKey: CAPSOLVER.API_KEY,
+        taskId,
+      });
+
+      if (response.data.errorId !== 0) {
+        throw new Error(`CapSolver error: ${response.data.errorDescription}`);
+      }
+
+      if (response.data.status === "ready") {
+        const cfClearance = response.data.solution.token;
+        const elapsed = Date.now() - startTime;
+        log.info(`CapSolver solved Cloudflare challenge in ${elapsed}ms`);
+        log.debug(`cf_clearance cookie: ${cfClearance}`);
+        return cfClearance;
+      }
+
+      log.debug(`CapSolver status: ${response.data.status}, waiting...`);
+      await new Promise((resolve) => setTimeout(resolve, CAPSOLVER.POLL_INTERVAL_MS));
+    }
+
+    throw new Error("CapSolver timeout: solution not received in time");
+  }
+
+  private async solveCloudflareWithCapSolver(websiteURL: string): Promise<string> {
+    log.info("Solving Cloudflare challenge with CapSolver");
+
+    const taskId = await this.createCapSolverTask(websiteURL);
+    const cfClearance = await this.getCapSolverResult(taskId);
+
+    return cfClearance;
+  }
+
+  private async handleCloudflareChallenge(url: string): Promise<string | null> {
+    log.debug("Detecting Cloudflare challenge");
+    try {
+      const response = await axios.get(url, {
+        headers: HTTP_HEADERS,
+        validateStatus: () => true,
+      });
+
+      const isChallenge = response.status === 403 ||
+                         response.data.includes('Just a moment') ||
+                         response.data.includes('cf-turnstile-response') ||
+                         response.data.includes('challenge-platform');
+
+      if (isChallenge) {
+        log.info("Cloudflare challenge detected, solving with CapSolver");
+        const cfClearance = await this.solveCloudflareWithCapSolver(url);
+        return `${ANTI_BOT.CLOUDFLARE_COOKIE}=${cfClearance}`;
+      } else {
+        log.debug("No Cloudflare challenge detected");
+        return null;
+      }
+    } catch (error) {
+      log.error(`Cloudflare challenge detection error: ${error}`);
+      return null;
     }
   }
 
-  private async extractChallengeCookie(page: Page): Promise<string> {
-    const cookies = await page.cookies();
-    const cfClearance = cookies.find(
-      (cookie) => cookie.name === ANTI_BOT.CLOUDFLARE_COOKIE,
-    );
-    if (!cfClearance) {
-      throw new Error("cf_clearance cookie not found");
-    }
-    return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
-  }
 
   private async scrapeDetailsWithCookie(
     url: string,
@@ -77,53 +136,28 @@ export class CrawlerService {
     pageNumber: number,
   ): Promise<{ listings: any[]; challengeCookie: string }> {
     const url = `${this.baseUrl}&page=${pageNumber}`;
-    log.info(`Opening browser for page ${pageNumber}`);
+    log.info(`Scraping page ${pageNumber} with CapSolver`);
 
-    const browser = await puppeteer.launch({
-      headless: BROWSER_CONFIG.HEADLESS,
-      args: BROWSER_CONFIG.ARGS,
-    });
-    log.debug("Browser launched");
+    const challengeCookie = await this.handleCloudflareChallenge(url);
 
-    try {
-      const page = await browser.newPage();
-      log.debug("New page created");
-
-      await page.setUserAgent(USER_AGENTS.WINDOWS);
-      log.info(`Navigating to ${url}`);
-
-      await page.goto(url, {
-        waitUntil: "networkidle2",
-        timeout: TIMEOUTS.PAGE_LOAD,
-      });
-      log.debug("Page loaded");
-
-      await this.simulateMouseMovement(page);
-
-      log.debug("Waiting for Cloudflare challenge");
-      await new Promise((resolve) =>
-        setTimeout(resolve, TIMEOUTS.CLOUDFLARE_WAIT),
-      );
-
-      await page.waitForNetworkIdle({ timeout: TIMEOUTS.NETWORK_IDLE });
-      log.debug("Network idle");
-
-      const challengeCookie = await this.extractChallengeCookie(page);
-      log.debug("Extracted challenge cookie");
-
-      const html = await page.content();
-      const data: RawListingsData = parseHydrationData(html);
-      const listings = data.props?.pageProps?.listings || [];
-      log.info(`Found ${listings.length} listings on page ${pageNumber}`);
-
-      return { listings, challengeCookie };
-    } catch (error) {
-      log.error(`Error scraping page ${pageNumber}`, { error: String(error) });
-      throw error;
-    } finally {
-      log.debug("Closing browser");
-      await browser.close();
+    if (!challengeCookie) {
+      throw new Error("Failed to get cf_clearance cookie from CapSolver");
     }
+
+    log.info("Got cf_clearance cookie, fetching listings");
+
+    const response = await axios.get(url, {
+      headers: {
+        ...HTTP_HEADERS,
+        cookie: challengeCookie,
+      },
+    });
+
+    const data: RawListingsData = parseHydrationData(response.data);
+    const listings = data.props?.pageProps?.listings || [];
+    log.info(`Found ${listings.length} listings on page ${pageNumber}`);
+
+    return { listings, challengeCookie };
   }
 
   async scrapeAllProperties(): Promise<RawPropertyData[]> {

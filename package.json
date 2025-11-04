@@ -9,7 +9,13 @@
     "build": "tsc",
     "dev": "tsx src/main.ts"
   },
-  "keywords": ["apify", "actor", "scraper", "daft", "real-estate"],
+  "keywords": [
+    "apify",
+    "actor",
+    "scraper",
+    "daft",
+    "real-estate"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -20,6 +26,7 @@
   "dependencies": {
     "apify": "^3.0.0",
     "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
     "puppeteer": "^24.26.1",
     "tsx": "^4.20.6"
   }
