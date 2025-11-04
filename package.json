@@ -1,0 +1,26 @@
+{
+  "name": "daft-property-scraper",
+  "version": "1.0.0",
+  "description": "Apify actor for scraping property listings from Daft.ie",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "build": "tsc",
+    "dev": "tsx src/main.ts"
+  },
+  "keywords": ["apify", "actor", "scraper", "daft", "real-estate"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "apify": "^3.0.0",
+    "axios": "^1.12.2",
+    "puppeteer": "^24.26.1",
+    "tsx": "^4.20.6"
+  }
+}

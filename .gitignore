@@ -1,0 +1,10 @@
+node_modules
+dist
+apify_storage
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!.actor/**/*.json
+.DS_Store
+*.log

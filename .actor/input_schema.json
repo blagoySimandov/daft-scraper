@@ -1,0 +1,36 @@
+{
+  "title": "Daft.ie Property Scraper Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "searchTerm": {
+      "title": "Search Term",
+      "type": "string",
+      "description": "Property search term (e.g., 'derelict', 'renovate', 'cottage')",
+      "default": "derelict",
+      "editor": "textfield"
+    },
+    "saleOrRent": {
+      "title": "Sale or Rent",
+      "type": "string",
+      "description": "Search for properties for sale or rent",
+      "default": "sale",
+      "enum": ["sale", "rent"],
+      "enumTitles": ["For Sale", "For Rent"]
+    },
+    "location": {
+      "title": "Location",
+      "type": "string",
+      "description": "Optional location filter (e.g., 'dublin', 'cork', 'galway'). Leave empty for all of Ireland",
+      "editor": "textfield"
+    },
+    "maxProperties": {
+      "title": "Maximum Properties",
+      "type": "integer",
+      "description": "Maximum number of properties to scrape. Leave empty to scrape all available",
+      "minimum": 1,
+      "editor": "number"
+    }
+  },
+  "required": ["searchTerm", "saleOrRent"]
+}

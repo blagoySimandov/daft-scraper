@@ -1,0 +1,12 @@
+{
+  "actorSpecification": 1,
+  "name": "daft-property-scraper",
+  "title": "Daft.ie Property Scraper",
+  "description": "Scrapes property listings from Daft.ie based on search terms. Handles Cloudflare protection and extracts detailed property information including prices, locations, amenities, and media.",
+  "version": "1.0",
+  "meta": {
+    "templateId": "typescript"
+  },
+  "input": "./.actor/input_schema.json",
+  "dockerfile": "./Dockerfile"
+}
