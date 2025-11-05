@@ -5,9 +5,8 @@
   "main": "dist/main.js",
   "type": "module",
   "scripts": {
-    "start": "node dist/main.js",
-    "build": "tsc",
-    "dev": "tsx src/main.ts"
+    "start": "tsx src/main.ts",
+    "build": "tsc"
   },
   "keywords": [
     "apify",

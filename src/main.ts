@@ -17,8 +17,9 @@ if (!Actor.isAtHome()) {
 }
 
 const input = (await Actor.getInput<Input>()) || {
-  searchTerm: "derelict",
-  saleOrRent: "sale",
+  searchTerm: "",
+  saleOrRent: "rent",
+  maxProperties: 20,
 };
 
 log.info("Starting scraper", {
@@ -52,7 +53,9 @@ const deduplicated = DataCleanerService.removeDuplicates(cleanedProperties);
 const sorted = DataCleanerService.sortByPublishDate(deduplicated);
 
 if (deduplicated.length < cleanedProperties.length) {
-  log.debug(`Removed ${cleanedProperties.length - deduplicated.length} duplicates`);
+  log.debug(
+    `Removed ${cleanedProperties.length - deduplicated.length} duplicates`,
+  );
 }
 
 if (Actor.isAtHome()) {

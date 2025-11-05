@@ -25,6 +25,7 @@ export const TIMEOUTS = {
   NETWORK_IDLE: 10000,
   CLOUDFLARE_WAIT: 3000,
   MOUSE_MOVE_DELAY: 100,
+  MOUSE_MOVEMENTS: 20,
   CLOUDFLARE_CHECKBOX_WAIT: 10000,
   AFTER_CHECKBOX_CLICK: 5000,
 } as const;
@@ -32,6 +33,11 @@ export const TIMEOUTS = {
 export const ANTI_BOT = {
   MOUSE_MOVEMENTS: 20,
   CLOUDFLARE_COOKIE: "cf_clearance",
+  CONCURRENCY_LIMIT: 5,
+} as const;
+
+export const WEBSHARE = {
+  API_TOKEN: process.env.WEBSHARE || "",
 } as const;
 
 export const CAPSOLVER = {
@@ -39,7 +45,6 @@ export const CAPSOLVER = {
   CREATE_TASK_URL: "https://api.capsolver.com/createTask",
   GET_RESULT_URL: "https://api.capsolver.com/getTaskResult",
   TASK_TYPE: "AntiCloudflareTask",
-  PROXY: process.env.PROXY,
   POLL_INTERVAL_MS: 1000,
   MAX_POLL_TIME_MS: 120000,
 } as const;
@@ -85,6 +90,7 @@ export const HTTP_HEADERS = {
   "accept-language": "en-US,en;q=0.9",
   "cache-control": "no-cache",
   pragma: "no-cache",
+  "User-Agent": USER_AGENTS.MACOS,
   priority: "u=0, i",
   "sec-ch-ua":
     '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
