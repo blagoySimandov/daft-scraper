@@ -8,5 +8,56 @@
     "templateId": "typescript"
   },
   "input": "./input_schema.json",
-  "dockerfile": "../Dockerfile"
+  "dockerfile": "../Dockerfile",
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "views": {
+        "overview": {
+          "title": "Overview",
+          "transformation": {
+            "fields": [
+              "id",
+              "title",
+              "price",
+              "bedrooms",
+              "bathrooms",
+              "propertyType",
+              "location",
+              "dates"
+            ]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "id": {
+                "label": "ID"
+              },
+              "title": {
+                "label": "Title"
+              },
+              "price": {
+                "label": "Price"
+              },
+              "bedrooms": {
+                "label": "Beds"
+              },
+              "bathrooms": {
+                "label": "Baths"
+              },
+              "propertyType": {
+                "label": "Type"
+              },
+              "location": {
+                "label": "Location"
+              },
+              "dates": {
+                "label": "Dates"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

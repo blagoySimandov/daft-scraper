@@ -6,8 +6,8 @@
     "searchTerm": {
       "title": "Search Term",
       "type": "string",
-      "description": "Property search term (e.g., 'derelict', 'renovate', 'cottage')",
-      "default": "derelict",
+      "description": "Property search term (e.g., 'derelict', 'apartment', 'cottage')",
+      "default": "",
       "editor": "textfield"
     },
     "saleOrRent": {
@@ -27,8 +27,9 @@
     "maxProperties": {
       "title": "Maximum Properties",
       "type": "integer",
-      "description": "Maximum number of properties to scrape. Leave empty to scrape all available",
-      "minimum": 1,
+      "description": "Maximum number of properties to scrape. Set to -1 for unlimited. Default is 20.",
+      "default": 20,
+      "minimum": -1,
       "editor": "number"
     }
   },

@@ -299,7 +299,7 @@ export class CrawlerService {
     log.info(`Starting scrape from: ${this.baseUrl}`);
 
     while (true) {
-      if (maxProperties && allProperties.length >= maxProperties) {
+      if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties) {
         log.info(`Reached max properties limit: ${maxProperties}`);
         break;
       }
@@ -325,13 +325,13 @@ export class CrawlerService {
           i < validListings.length;
           i += ANTI_BOT.CONCURRENCY_LIMIT
         ) {
-          if (maxProperties && allProperties.length >= maxProperties) break;
+          if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties) break;
 
           const chunk = validListings.slice(i, i + ANTI_BOT.CONCURRENCY_LIMIT);
 
           const results = await Promise.allSettled(
             chunk.map(async (listing) => {
-              if (maxProperties && allProperties.length >= maxProperties)
+              if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties)
                 return;
 
               const seoFriendlyPath = listing.listing?.seoFriendlyPath!;

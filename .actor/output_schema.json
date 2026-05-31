@@ -1,0 +1,282 @@
+{
+  "title": "Daft.ie Property Output",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "id": {
+      "title": "Property ID",
+      "type": "integer",
+      "description": "Unique identifier for the property listing"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string",
+      "description": "Property listing title"
+    },
+    "seoTitle": {
+      "title": "SEO Title",
+      "type": "string",
+      "description": "SEO-optimized title"
+    },
+    "daftShortcode": {
+      "title": "Daft Shortcode",
+      "type": "string",
+      "description": "Unique shortcode for the property on Daft.ie"
+    },
+    "seoFriendlyPath": {
+      "title": "SEO Path",
+      "type": "string",
+      "description": "URL path to the property listing"
+    },
+    "propertyType": {
+      "title": "Property Type",
+      "type": "string",
+      "description": "Type of property (e.g., house, apartment)"
+    },
+    "price": {
+      "title": "Price",
+      "type": "object",
+      "description": "Property price information",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "formatted": {
+          "type": "string"
+        }
+      }
+    },
+    "bedrooms": {
+      "title": "Bedrooms",
+      "type": "integer",
+      "description": "Number of bedrooms"
+    },
+    "bathrooms": {
+      "title": "Bathrooms",
+      "type": "integer",
+      "description": "Number of bathrooms"
+    },
+    "floorArea": {
+      "title": "Floor Area",
+      "type": "object",
+      "description": "Property floor area",
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "floorAreaFormatted": {
+      "title": "Floor Area Formatted",
+      "type": "string",
+      "description": "Human-readable floor area"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string",
+      "description": "Full property description"
+    },
+    "features": {
+      "title": "Features",
+      "type": "array",
+      "description": "List of property features",
+      "items": {
+        "type": "string"
+      }
+    },
+    "location": {
+      "title": "Location",
+      "type": "object",
+      "description": "Property location details",
+      "properties": {
+        "areaName": {
+          "type": ["string", "null"]
+        },
+        "primaryAreaId": {
+          "type": ["integer", "null"]
+        },
+        "isInRepublicOfIreland": {
+          "type": "boolean"
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "eircodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dates": {
+      "title": "Dates",
+      "type": "object",
+      "description": "Important dates for the property",
+      "properties": {
+        "publishDate": {
+          "type": "string"
+        },
+        "lastUpdateDate": {
+          "type": "string"
+        },
+        "dateOfConstruction": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "media": {
+      "title": "Media",
+      "type": "object",
+      "description": "Property media information",
+      "properties": {
+        "images": {
+          "type": "array"
+        },
+        "totalImages": {
+          "type": "integer"
+        },
+        "hasVideo": {
+          "type": "boolean"
+        },
+        "hasVirtualTour": {
+          "type": "boolean"
+        },
+        "hasBrochure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "seller": {
+      "title": "Seller",
+      "type": "object",
+      "description": "Seller/agent information",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "branch": {
+          "type": ["string", "null"]
+        },
+        "address": {
+          "type": ["string", "null"]
+        },
+        "phone": {
+          "type": ["string", "null"]
+        },
+        "alternativePhone": {
+          "type": ["string", "null"]
+        },
+        "licenceNumber": {
+          "type": ["string", "null"]
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "premierPartner": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ber": {
+      "title": "BER Rating",
+      "type": "object",
+      "description": "Building Energy Rating",
+      "properties": {
+        "rating": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "amenities": {
+      "title": "Amenities",
+      "type": "object",
+      "description": "Nearby amenities and facilities",
+      "properties": {
+        "primarySchools": {
+          "type": "array"
+        },
+        "secondarySchools": {
+          "type": "array"
+        },
+        "publicTransports": {
+          "type": "array"
+        }
+      }
+    },
+    "priceHistory": {
+      "title": "Price History",
+      "type": "array",
+      "description": "Historical price changes",
+      "items": {
+        "type": "object"
+      }
+    },
+    "extracted": {
+      "title": "Extracted Data",
+      "type": "object",
+      "description": "Extracted information from listing",
+      "properties": {
+        "folios": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "utilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "nearbyLocations": {
+          "type": "object"
+        }
+      }
+    },
+    "metadata": {
+      "title": "Metadata",
+      "type": "object",
+      "description": "Listing metadata",
+      "properties": {
+        "featuredLevel": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "sellingType": {
+          "type": "string"
+        }
+      }
+    },
+    "analytics": {
+      "title": "Analytics",
+      "type": "object",
+      "description": "Listing analytics",
+      "properties": {
+        "listingViews": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

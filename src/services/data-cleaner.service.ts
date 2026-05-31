@@ -41,7 +41,8 @@ export class DataCleanerService {
         propertyType: listing.propertyType,
         sections: listing.sections || [],
         price: extractPrice(listing.price) || undefined,
-        bedrooms: extractNumber(listing.numBedrooms) || listing.nonFormatted?.beds,
+        bedrooms:
+          extractNumber(listing.numBedrooms) || listing.nonFormatted?.beds,
         bathrooms: extractNumber(listing.numBathrooms),
         location: {
           areaName: listing.areaName,
@@ -51,8 +52,10 @@ export class DataCleanerService {
           eircodes: extractEircodes(description),
         },
         dates: {
-          publishDate: parseDate(listing.publishDate) || new Date().toISOString(),
-          lastUpdateDate: parseDate(listing.lastUpdateDate) || new Date().toISOString(),
+          publishDate:
+            parseDate(listing.publishDate) || new Date().toISOString(),
+          lastUpdateDate:
+            parseDate(listing.lastUpdateDate) || new Date().toISOString(),
           dateOfConstruction: listing.dateOfConstruction || null,
         },
         media: {

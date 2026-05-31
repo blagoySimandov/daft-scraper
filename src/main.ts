@@ -26,7 +26,7 @@ log.info("Starting scraper", {
   searchTerm: input.searchTerm,
   saleOrRent: input.saleOrRent,
   location: input.location || "ireland",
-  maxProperties: input.maxProperties || "unlimited",
+  maxProperties: input.maxProperties && input.maxProperties > 0 ? input.maxProperties : "unlimited",
 });
 
 const crawler = new CrawlerService({
