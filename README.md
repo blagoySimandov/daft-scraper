@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Daft.ie Property Scraper
 
 Scrapes property listings from Daft.ie based on search criteria.
@@ -44,3 +45,6 @@ Each property returns:
 - **extracted**: Folios, utilities, nearby locations
 - **metadata**: Category, state, selling type
 - **analytics**: Listing views
+=======
+# Daft Scraper with Apify
+>>>>>>> main
