@@ -4,6 +4,7 @@ COPY --chown=myuser:myuser package*.json ./
 
 RUN npm --quiet set progress=false \
  && npm install \
+ && npx puppeteer browsers install chrome \
  && echo "Installed NPM packages:" \
  && (npm list --all || true) \
  && echo "Node.js version:" \
