@@ -59,6 +59,7 @@ export const DAFT = {
   DOMAIN: "https://www.daft.ie",
   DEFAULT_SEARCH: "derelict",
   DEFAULT_SALE_OR_RENT: "sale",
+  HYDRATION_SELECTOR: "#__NEXT_DATA__",
 } as const;
 
 export const PATTERNS = {

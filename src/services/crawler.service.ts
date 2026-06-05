@@ -1,6 +1,6 @@
 import axios from "axios";
 import { log } from "apify";
-import puppeteer, { Page } from "puppeteer";
+import puppeteer, { Browser, Page } from "puppeteer";
 import {
   ANTI_BOT,
   HTTP_HEADERS,
@@ -25,7 +25,7 @@ export class CrawlerService {
   private config: CrawlerConfig;
   private baseUrl: string;
   private delayMs: number;
-  private cachedChallengeCookie: string | null = null;
+  private browser: Browser | null = null;
 
   constructor(config: CrawlerConfig) {
     this.config = config;
@@ -157,137 +157,63 @@ export class CrawlerService {
     }
   }
 
-  private async waitForChallengeCookie(page: Page): Promise<string> {
-    log.debug("Polling for cf_clearance cookie...");
-    const deadline = Date.now() + TIMEOUTS.PAGE_LOAD;
-    while (Date.now() < deadline) {
-      const cookies = await page.cookies();
-      const found = cookies.find(
-        (c) => c.name === ANTI_BOT.CLOUDFLARE_COOKIE,
-      );
-      if (found) return found.value;
-      await new Promise((resolve) =>
-        setTimeout(resolve, TIMEOUTS.CLOUDFLARE_WAIT),
-      );
-    }
-    throw new Error("cf_clearance cookie not found after challenge");
-  }
-
-  private async solveCloudflareWithBrowser(
-    websiteURL: string,
-  ): Promise<string> {
-    log.info("Solving Cloudflare JS challenge with Puppeteer");
-
-    const browser = await puppeteer.launch({
+  private async getBrowser(): Promise<Browser> {
+    if (this.browser) return this.browser;
+    log.info("Launching browser");
+    this.browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
+    return this.browser;
+  }
 
+  private async closeBrowser(): Promise<void> {
+    if (!this.browser) return;
+    await this.browser.close();
+    this.browser = null;
+  }
+
+  private async waitForHydration(page: Page): Promise<void> {
+    const ready = await page.$(DAFT.HYDRATION_SELECTOR);
+    if (ready) return;
+    log.debug("Cloudflare challenge present, solving in browser");
+    await this.simulateMouseMovements(page);
+    await page.waitForSelector(DAFT.HYDRATION_SELECTOR, {
+      timeout: TIMEOUTS.PAGE_LOAD,
+    });
+  }
+
+  private async fetchPageHtml(url: string): Promise<string> {
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
     try {
-      const page = await browser.newPage();
       await page.setUserAgent(HTTP_HEADERS["User-Agent"]);
-
-      log.debug(`Navigating to ${websiteURL}`);
-      await page.goto(websiteURL, {
+      await page.goto(url, {
         waitUntil: "domcontentloaded",
         timeout: TIMEOUTS.PAGE_LOAD,
       });
-
-      await this.simulateMouseMovements(page);
-      const cfClearance = await this.waitForChallengeCookie(page);
-
-      log.info("Successfully solved Cloudflare JS challenge with browser");
-      return cfClearance;
+      await this.waitForHydration(page);
+      return await page.content();
     } finally {
-      await browser.close();
+      await page.close();
     }
   }
 
-  private async scrapeDetailsWithCookie(
-    url: string,
-    challengeCookie: string,
-  ): Promise<RawPropertyData> {
-    const response = await axios.get(url, {
-      headers: {
-        ...HTTP_HEADERS,
-        cookie: challengeCookie,
-      },
-    });
-    return parseHydrationData(response.data);
+  private async scrapeDetails(url: string): Promise<RawPropertyData> {
+    const html = await this.fetchPageHtml(url);
+    return parseHydrationData(html);
   }
 
-  private async scrapeListingsPage(
-    pageNumber: number,
-  ): Promise<{ listings: any[]; challengeCookie: string }> {
+  private async scrapeListingsPage(pageNumber: number): Promise<any[]> {
     const url = `${this.baseUrl}&page=${pageNumber}`;
     log.info(`Scraping page ${pageNumber}`);
 
-    let response;
-    let challengeCookie = this.cachedChallengeCookie;
-
-    if (challengeCookie) {
-      log.debug("Trying with cached cf_clearance cookie");
-      response = await axios.get(url, {
-        headers: {
-          ...HTTP_HEADERS,
-          cookie: challengeCookie,
-        },
-        validateStatus: () => true,
-      });
-
-      if (this.detectChallengeType(response)) {
-        log.warning("Cached cookie expired or invalid, solving challenge");
-        challengeCookie = null;
-        this.cachedChallengeCookie = null;
-      } else {
-        log.debug("Cached cookie still valid");
-      }
-    }
-
-    if (!challengeCookie) {
-      log.info("No valid cookie, trying request without cookie first");
-      response = await axios.get(url, {
-        headers: HTTP_HEADERS,
-        validateStatus: () => true,
-      });
-
-      const challengeType = this.detectChallengeType(response);
-
-      if (challengeType) {
-        log.info(`Cloudflare ${challengeType} detected, solving...`);
-
-        let cfClearance: string;
-        if (challengeType === "turnstile") {
-          cfClearance = await this.solveCloudflareWithCapSolver(url);
-        } else {
-          cfClearance = await this.solveCloudflareWithBrowser(url);
-        }
-
-        challengeCookie = `${ANTI_BOT.CLOUDFLARE_COOKIE}=${cfClearance}`;
-        this.cachedChallengeCookie = challengeCookie;
-        log.info("Cached new cf_clearance cookie for future requests");
-
-        log.debug("Retrying request with new cookie");
-        response = await axios.get(url, {
-          headers: {
-            ...HTTP_HEADERS,
-            cookie: challengeCookie,
-          },
-        });
-      } else {
-        log.debug("No Cloudflare challenge, proceeding without cookie");
-      }
-    }
-
-    if (!response) {
-      throw new Error("Failed to fetch listings page");
-    }
-
-    const data: RawListingsData = parseHydrationData(response.data);
+    const html = await this.fetchPageHtml(url);
+    const data: RawListingsData = parseHydrationData(html);
     const listings = data.props?.pageProps?.listings || [];
     log.info(`Found ${listings.length} listings on page ${pageNumber}`);
 
-    return { listings, challengeCookie: challengeCookie || "" };
+    return listings;
   }
 
   async scrapeAllProperties(): Promise<RawPropertyData[]> {
@@ -297,6 +223,20 @@ export class CrawlerService {
 
     log.info(`Starting scrape from: ${this.baseUrl}`);
 
+    try {
+      await this.scrapePages(allProperties, currentPage, maxProperties);
+    } finally {
+      await this.closeBrowser();
+    }
+
+    return allProperties;
+  }
+
+  private async scrapePages(
+    allProperties: RawPropertyData[],
+    currentPage: number,
+    maxProperties: number | undefined,
+  ): Promise<void> {
     while (true) {
       if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties) {
         log.info(`Reached max properties limit: ${maxProperties}`);
@@ -306,8 +246,7 @@ export class CrawlerService {
       log.info(`Scraping page ${currentPage}`);
 
       try {
-        const { listings, challengeCookie } =
-          await this.scrapeListingsPage(currentPage);
+        const listings = await this.scrapeListingsPage(currentPage);
 
         if (listings.length === 0) {
           log.info("No more listings found");
@@ -318,7 +257,6 @@ export class CrawlerService {
           (listing) => listing.listing?.seoFriendlyPath,
         );
 
-        // Process listings in chunks of CONCURRENCY_LIMIT
         for (
           let i = 0;
           i < validListings.length;
@@ -340,10 +278,7 @@ export class CrawlerService {
                 await new Promise((resolve) =>
                   setTimeout(resolve, this.delayMs),
                 );
-                const propertyDetails = await this.scrapeDetailsWithCookie(
-                  propertyUrl,
-                  challengeCookie,
-                );
+                const propertyDetails = await this.scrapeDetails(propertyUrl);
                 allProperties.push(propertyDetails);
                 log.info(`Scraped ${allProperties.length} properties`);
               } catch (error) {
@@ -366,7 +301,5 @@ export class CrawlerService {
         break;
       }
     }
-
-    return allProperties;
   }
 }
