@@ -1,5 +1,7 @@
 FROM apify/actor-node-puppeteer-chrome
 
+ENV PUPPETEER_CACHE_DIR=/home/myuser/.cache/puppeteer
+
 COPY --chown=myuser:myuser package*.json ./
 
 RUN npm --quiet set progress=false \
