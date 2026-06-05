@@ -1,18 +1,8 @@
-import axios from "axios";
 import { log } from "apify";
 import puppeteer, { Browser, Page } from "puppeteer";
-import {
-  ANTI_BOT,
-  HTTP_HEADERS,
-  DAFT,
-  SCRAPING,
-  CAPSOLVER,
-  WEBSHARE,
-  TIMEOUTS,
-} from "../config";
+import { ANTI_BOT, HTTP_HEADERS, DAFT, SCRAPING, TIMEOUTS } from "../config";
 import { parseHydrationData } from "../utils";
 import type { RawListingsData, RawPropertyData } from "../models";
-import { WebshareService } from "./webshare.service";
 
 export interface CrawlerConfig {
   searchTerm: string;
@@ -31,7 +21,6 @@ export class CrawlerService {
     this.config = config;
     this.delayMs = SCRAPING.DEFAULT_DELAY_MS;
     this.baseUrl = this.buildSearchUrl();
-    WebshareService.setApiToken(WEBSHARE.API_TOKEN);
   }
 
   private buildSearchUrl(): string {
@@ -41,108 +30,6 @@ export class CrawlerService {
     return searchTerm
       ? `${baseUrl}&terms=${encodeURIComponent(searchTerm)}`
       : baseUrl;
-  }
-
-  private async createCapSolverTask(websiteURL: string): Promise<string> {
-    log.debug(`Creating CapSolver AntiCloudflareTask for ${websiteURL}`);
-    const proxy = await WebshareService.getRandomProxy();
-    log.info(`Using proxy for CapSolver: ${proxy.split("@")[1]}`);
-
-    const response = await axios.post(CAPSOLVER.CREATE_TASK_URL, {
-      clientKey: CAPSOLVER.API_KEY,
-      task: {
-        type: CAPSOLVER.TASK_TYPE,
-        websiteURL,
-        proxy,
-      },
-    });
-
-    if (response.data.errorId !== 0) {
-      throw new Error(`CapSolver error: ${response.data.errorDescription}`);
-    }
-
-    log.debug(`CapSolver task created: ${response.data.taskId}`);
-    return response.data.taskId;
-  }
-
-  private async getCapSolverResult(taskId: string): Promise<string> {
-    log.debug(`Polling CapSolver for cf_clearance cookie: ${taskId}`);
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < CAPSOLVER.MAX_POLL_TIME_MS) {
-      const response = await axios.post(CAPSOLVER.GET_RESULT_URL, {
-        clientKey: CAPSOLVER.API_KEY,
-        taskId,
-      });
-
-      if (response.data.errorId !== 0) {
-        throw new Error(`CapSolver error: ${response.data.errorDescription}`);
-      }
-
-      if (response.data.status === "ready") {
-        const cfClearance = response.data.solution.token;
-        const elapsed = Date.now() - startTime;
-        log.info(`CapSolver solved Cloudflare challenge in ${elapsed}ms`);
-        log.debug(`cf_clearance cookie: ${cfClearance}`);
-        return cfClearance;
-      }
-
-      log.debug(`CapSolver status: ${response.data.status}, waiting...`);
-      await new Promise((resolve) =>
-        setTimeout(resolve, CAPSOLVER.POLL_INTERVAL_MS),
-      );
-    }
-
-    throw new Error("CapSolver timeout: solution not received in time");
-  }
-
-  private async solveCloudflareWithCapSolver(
-    websiteURL: string,
-  ): Promise<string> {
-    log.info("Solving Cloudflare challenge with CapSolver");
-
-    const taskId = await this.createCapSolverTask(websiteURL);
-    const cfClearance = await this.getCapSolverResult(taskId);
-
-    return cfClearance;
-  }
-
-  private isCloudflareChallenge(response: any): boolean {
-    const isChallenge =
-      response.status === 403 ||
-      response.data.includes("Just a moment") ||
-      response.data.includes("cf-turnstile-response") ||
-      response.data.includes("challenge-platform");
-    return isChallenge;
-  }
-
-  private detectChallengeType(
-    response: any,
-  ): "turnstile" | "js-challenge" | null {
-    if (!this.isCloudflareChallenge(response)) {
-      return null;
-    }
-
-    const html = response.data;
-
-    if (html.includes("cf-turnstile-response") || html.includes("turnstile")) {
-      log.debug("Detected Turnstile challenge");
-      return "turnstile";
-    }
-
-    if (
-      html.includes("jschl-answer") ||
-      html.includes("challenge-form") ||
-      html.includes("Just a moment")
-    ) {
-      log.debug("Detected JS challenge");
-      return "js-challenge";
-    }
-
-    log.debug(
-      "Detected unknown Cloudflare challenge, defaulting to JS challenge",
-    );
-    return "js-challenge";
   }
 
   private async simulateMouseMovements(page: Page): Promise<void> {

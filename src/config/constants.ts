@@ -1,52 +1,16 @@
-import dotenv from "dotenv";
-
-dotenv.config();
-
-export const BROWSER_CONFIG = {
-  HEADLESS: true,
-  ARGS: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-blink-features=AutomationControlled",
-    "--disable-web-security",
-    "--disable-features=IsolateOrigins,site-per-process",
-  ] as const,
-} as const;
-
 export const USER_AGENTS = {
-  WINDOWS:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   MACOS:
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
 } as const;
 
 export const TIMEOUTS = {
   PAGE_LOAD: 60000,
-  NETWORK_IDLE: 10000,
-  CLOUDFLARE_WAIT: 3000,
   MOUSE_MOVE_DELAY: 100,
   MOUSE_MOVEMENTS: 20,
-  CLOUDFLARE_CHECKBOX_WAIT: 10000,
-  AFTER_CHECKBOX_CLICK: 5000,
 } as const;
 
 export const ANTI_BOT = {
-  MOUSE_MOVEMENTS: 20,
-  CLOUDFLARE_COOKIE: "cf_clearance",
   CONCURRENCY_LIMIT: 5,
-} as const;
-
-export const WEBSHARE = {
-  API_TOKEN: process.env.WEBSHARE || "",
-} as const;
-
-export const CAPSOLVER = {
-  API_KEY: process.env.CAPSOLVER_API_KEY || "",
-  CREATE_TASK_URL: "https://api.capsolver.com/createTask",
-  GET_RESULT_URL: "https://api.capsolver.com/getTaskResult",
-  TASK_TYPE: "AntiCloudflareTask",
-  POLL_INTERVAL_MS: 1000,
-  MAX_POLL_TIME_MS: 120000,
 } as const;
 
 export const SCRAPING = {
