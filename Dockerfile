@@ -1,12 +1,11 @@
 FROM apify/actor-node-puppeteer-chrome
 
-ENV PUPPETEER_CACHE_DIR=/home/myuser/.cache/puppeteer
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 COPY --chown=myuser:myuser package*.json ./
 
 RUN npm --quiet set progress=false \
  && npm install \
- && npx puppeteer browsers install chrome \
  && echo "Installed NPM packages:" \
  && (npm list --all || true) \
  && echo "Node.js version:" \
