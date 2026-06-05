@@ -1,6 +1,6 @@
 import axios from "axios";
 import { log } from "apify";
-import puppeteer from "puppeteer";
+import puppeteer, { Page } from "puppeteer";
 import {
   ANTI_BOT,
   HTTP_HEADERS,
@@ -145,6 +145,34 @@ export class CrawlerService {
     return "js-challenge";
   }
 
+  private async simulateMouseMovements(page: Page): Promise<void> {
+    log.debug(`Simulating ${TIMEOUTS.MOUSE_MOVEMENTS} mouse movements`);
+    for (let i = 0; i < TIMEOUTS.MOUSE_MOVEMENTS; i++) {
+      const x = Math.floor(Math.random() * 800) + 100;
+      const y = Math.floor(Math.random() * 600) + 100;
+      await page.mouse.move(x, y);
+      await new Promise((resolve) =>
+        setTimeout(resolve, TIMEOUTS.MOUSE_MOVE_DELAY),
+      );
+    }
+  }
+
+  private async waitForChallengeCookie(page: Page): Promise<string> {
+    log.debug("Polling for cf_clearance cookie...");
+    const deadline = Date.now() + TIMEOUTS.PAGE_LOAD;
+    while (Date.now() < deadline) {
+      const cookies = await page.cookies();
+      const found = cookies.find(
+        (c) => c.name === ANTI_BOT.CLOUDFLARE_COOKIE,
+      );
+      if (found) return found.value;
+      await new Promise((resolve) =>
+        setTimeout(resolve, TIMEOUTS.CLOUDFLARE_WAIT),
+      );
+    }
+    throw new Error("cf_clearance cookie not found after challenge");
+  }
+
   private async solveCloudflareWithBrowser(
     websiteURL: string,
   ): Promise<string> {
@@ -152,53 +180,24 @@ export class CrawlerService {
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-      ],
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     try {
       const page = await browser.newPage();
-
       await page.setUserAgent(HTTP_HEADERS["User-Agent"]);
 
       log.debug(`Navigating to ${websiteURL}`);
       await page.goto(websiteURL, {
-        waitUntil: "networkidle2",
-        timeout: TIMEOUTS.PAGE_LOAD
+        waitUntil: "domcontentloaded",
+        timeout: TIMEOUTS.PAGE_LOAD,
       });
 
-      const movementCount = TIMEOUTS.MOUSE_MOVEMENTS;
-      log.debug(`Simulating ${movementCount} mouse movements`);
-
-      for (let i = 0; i < movementCount; i++) {
-        const x = Math.floor(Math.random() * 800) + 100;
-        const y = Math.floor(Math.random() * 600) + 100;
-        await page.mouse.move(x, y);
-        await new Promise((resolve) =>
-          setTimeout(resolve, TIMEOUTS.MOUSE_MOVE_DELAY),
-        );
-      }
-
-      log.debug("Waiting for JS challenge to resolve...");
-      await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.CLOUDFLARE_WAIT));
-
-      await page.waitForNetworkIdle({ timeout: 30000 });
-
-      log.debug("Extracting challenge cookie");
-
-      const cookies = await page.cookies();
-      const cfClearanceCookie = cookies.find(
-        (c) => c.name === ANTI_BOT.CLOUDFLARE_COOKIE,
-      );
-
-      if (!cfClearanceCookie) {
-        throw new Error("cf_clearance cookie not found after challenge");
-      }
+      await this.simulateMouseMovements(page);
+      const cfClearance = await this.waitForChallengeCookie(page);
 
       log.info("Successfully solved Cloudflare JS challenge with browser");
-      return cfClearanceCookie.value;
+      return cfClearance;
     } finally {
       await browser.close();
     }
