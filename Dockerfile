@@ -5,7 +5,7 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 COPY --chown=myuser:myuser package*.json ./
 
 RUN npm --quiet set progress=false \
- && npm install \
+ && npm install --include=dev \
  && echo "Installed NPM packages:" \
  && (npm list --all || true) \
  && echo "Node.js version:" \
