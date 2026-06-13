@@ -9,3 +9,7 @@ apify_storage
 .DS_Store
 *.log
 .env
+dashboard
+
+# Local Netlify folder
+.netlify

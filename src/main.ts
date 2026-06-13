@@ -12,6 +12,8 @@ interface Input {
 
 await Actor.init();
 
+const proxyConfiguration = await Actor.createProxyConfiguration();
+
 if (!Actor.isAtHome()) {
   log.setLevel(LogLevel.DEBUG);
 }
@@ -26,7 +28,10 @@ log.info("Starting scraper", {
   searchTerm: input.searchTerm,
   saleOrRent: input.saleOrRent,
   location: input.location || "ireland",
-  maxProperties: input.maxProperties && input.maxProperties > 0 ? input.maxProperties : "unlimited",
+  maxProperties:
+    input.maxProperties && input.maxProperties > 0
+      ? input.maxProperties
+      : "unlimited",
 });
 
 const crawler = new CrawlerService({
@@ -34,6 +39,7 @@ const crawler = new CrawlerService({
   saleOrRent: input.saleOrRent,
   maxProperties: input.maxProperties,
   location: input.location,
+  proxyConfiguration,
 });
 
 const rawProperties = await crawler.scrapeAllProperties();

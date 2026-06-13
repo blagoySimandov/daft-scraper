@@ -1,25 +1,30 @@
-import { log } from "apify";
-import puppeteer, { Browser, Page } from "puppeteer";
-import { ANTI_BOT, HTTP_HEADERS, DAFT, SCRAPING, TIMEOUTS } from "../config";
+import { log, ProxyConfiguration } from "apify";
+import {
+  PuppeteerCrawler,
+  type PuppeteerCrawlingContext,
+  type PuppeteerCrawler as PuppeteerCrawlerType,
+} from "crawlee";
+import { ANTI_BOT, DAFT, SCRAPING, TIMEOUTS } from "../config";
 import { parseHydrationData } from "../utils";
-import type { RawListingsData, RawPropertyData } from "../models";
+import type { RawListing, RawListingsData, RawPropertyData } from "../models";
+
+const LABELS = { LIST: "LIST", DETAIL: "DETAIL" } as const;
 
 export interface CrawlerConfig {
   searchTerm: string;
   saleOrRent: string;
   maxProperties?: number;
   location?: string;
+  proxyConfiguration?: ProxyConfiguration;
 }
 
 export class CrawlerService {
   private config: CrawlerConfig;
   private baseUrl: string;
-  private delayMs: number;
-  private browser: Browser | null = null;
+  private results: RawPropertyData[] = [];
 
   constructor(config: CrawlerConfig) {
     this.config = config;
-    this.delayMs = SCRAPING.DEFAULT_DELAY_MS;
     this.baseUrl = this.buildSearchUrl();
   }
 
@@ -32,161 +37,99 @@ export class CrawlerService {
       : baseUrl;
   }
 
-  private async simulateMouseMovements(page: Page): Promise<void> {
-    log.debug(`Simulating ${TIMEOUTS.MOUSE_MOVEMENTS} mouse movements`);
-    for (let i = 0; i < TIMEOUTS.MOUSE_MOVEMENTS; i++) {
-      const x = Math.floor(Math.random() * 800) + 100;
-      const y = Math.floor(Math.random() * 600) + 100;
-      await page.mouse.move(x, y);
-      await new Promise((resolve) =>
-        setTimeout(resolve, TIMEOUTS.MOUSE_MOVE_DELAY),
-      );
-    }
+  private limitReached(): boolean {
+    const max = this.config.maxProperties;
+    return !!max && max > 0 && this.results.length >= max;
   }
 
-  private async getBrowser(): Promise<Browser> {
-    if (this.browser) return this.browser;
-    log.info("Launching browser");
-    this.browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    return this.browser;
+  private listingUrl(page: number): string {
+    return `${this.baseUrl}&page=${page}`;
   }
 
-  private async closeBrowser(): Promise<void> {
-    if (!this.browser) return;
-    await this.browser.close();
-    this.browser = null;
-  }
-
-  private async waitForHydration(page: Page): Promise<void> {
-    const ready = await page.$(DAFT.HYDRATION_SELECTOR);
-    if (ready) return;
-    log.debug("Cloudflare challenge present, solving in browser");
-    await this.simulateMouseMovements(page);
-    await page.waitForSelector(DAFT.HYDRATION_SELECTOR, {
+  private async waitForData(ctx: PuppeteerCrawlingContext): Promise<void> {
+    await ctx.page.waitForSelector(DAFT.HYDRATION_SELECTOR, {
       timeout: TIMEOUTS.PAGE_LOAD,
     });
   }
 
-  private async fetchPageHtml(url: string): Promise<string> {
-    const browser = await this.getBrowser();
-    const page = await browser.newPage();
-    try {
-      await page.setUserAgent(HTTP_HEADERS["User-Agent"]);
-      await page.goto(url, {
-        waitUntil: "domcontentloaded",
-        timeout: TIMEOUTS.PAGE_LOAD,
-      });
-      await this.waitForHydration(page);
-      return await page.content();
-    } finally {
-      await page.close();
+  private async enqueueDetails(
+    crawler: PuppeteerCrawlerType,
+    listings: RawListing[],
+  ): Promise<void> {
+    for (const listing of listings) {
+      if (this.limitReached()) return;
+      const path = listing.listing?.seoFriendlyPath;
+      if (!path) continue;
+      await crawler.addRequests([
+        { url: `${DAFT.DOMAIN}${path}`, label: LABELS.DETAIL },
+      ]);
     }
   }
 
-  private async scrapeDetails(url: string): Promise<RawPropertyData> {
-    const html = await this.fetchPageHtml(url);
-    return parseHydrationData(html);
+  private async enqueueNextPage(
+    crawler: PuppeteerCrawlerType,
+    current: number,
+  ): Promise<void> {
+    if (this.limitReached()) return;
+    const next = current + 1;
+    await crawler.addRequests([
+      {
+        url: this.listingUrl(next),
+        label: LABELS.LIST,
+        userData: { page: next },
+      },
+    ]);
   }
 
-  private async scrapeListingsPage(pageNumber: number): Promise<any[]> {
-    const url = `${this.baseUrl}&page=${pageNumber}`;
-    log.info(`Scraping page ${pageNumber}`);
-
-    const html = await this.fetchPageHtml(url);
-    const data: RawListingsData = parseHydrationData(html);
+  private async handleList(ctx: PuppeteerCrawlingContext): Promise<void> {
+    await this.waitForData(ctx);
+    const data: RawListingsData = parseHydrationData(await ctx.page.content());
     const listings = data.props?.pageProps?.listings || [];
-    log.info(`Found ${listings.length} listings on page ${pageNumber}`);
+    const page = (ctx.request.userData.page as number) ?? 1;
+    log.info(`Found ${listings.length} listings on page ${page}`);
+    if (listings.length === 0) return;
+    await this.enqueueDetails(ctx.crawler, listings);
+    await this.enqueueNextPage(ctx.crawler, page);
+  }
 
-    return listings;
+  private async handleDetail(ctx: PuppeteerCrawlingContext): Promise<void> {
+    if (this.limitReached()) return;
+    await this.waitForData(ctx);
+    this.results.push(parseHydrationData(await ctx.page.content()));
+    log.info(`Scraped ${this.results.length} properties`);
+  }
+
+  private buildCrawler(): PuppeteerCrawler {
+    return new PuppeteerCrawler({
+      proxyConfiguration: this.config.proxyConfiguration,
+      maxConcurrency: ANTI_BOT.CONCURRENCY_LIMIT,
+      navigationTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
+      requestHandlerTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
+      launchContext: {
+        launchOptions: {
+          headless: true,
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        },
+      },
+      requestHandler: async (ctx) =>
+        ctx.request.label === LABELS.DETAIL
+          ? this.handleDetail(ctx)
+          : this.handleList(ctx),
+    });
   }
 
   async scrapeAllProperties(): Promise<RawPropertyData[]> {
-    const allProperties: RawPropertyData[] = [];
-    let currentPage = SCRAPING.DEFAULT_START_PAGE;
-    const maxProperties = this.config.maxProperties;
-
+    this.results = [];
     log.info(`Starting scrape from: ${this.baseUrl}`);
-
-    try {
-      await this.scrapePages(allProperties, currentPage, maxProperties);
-    } finally {
-      await this.closeBrowser();
-    }
-
-    return allProperties;
-  }
-
-  private async scrapePages(
-    allProperties: RawPropertyData[],
-    currentPage: number,
-    maxProperties: number | undefined,
-  ): Promise<void> {
-    while (true) {
-      if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties) {
-        log.info(`Reached max properties limit: ${maxProperties}`);
-        break;
-      }
-
-      log.info(`Scraping page ${currentPage}`);
-
-      try {
-        const listings = await this.scrapeListingsPage(currentPage);
-
-        if (listings.length === 0) {
-          log.info("No more listings found");
-          break;
-        }
-
-        const validListings = listings.filter(
-          (listing) => listing.listing?.seoFriendlyPath,
-        );
-
-        for (
-          let i = 0;
-          i < validListings.length;
-          i += ANTI_BOT.CONCURRENCY_LIMIT
-        ) {
-          if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties) break;
-
-          const chunk = validListings.slice(i, i + ANTI_BOT.CONCURRENCY_LIMIT);
-
-          const results = await Promise.allSettled(
-            chunk.map(async (listing) => {
-              if (maxProperties && maxProperties > 0 && allProperties.length >= maxProperties)
-                return;
-
-              const seoFriendlyPath = listing.listing?.seoFriendlyPath!;
-              const propertyUrl = `${DAFT.DOMAIN}${seoFriendlyPath}`;
-
-              try {
-                await new Promise((resolve) =>
-                  setTimeout(resolve, this.delayMs),
-                );
-                const propertyDetails = await this.scrapeDetails(propertyUrl);
-                allProperties.push(propertyDetails);
-                log.info(`Scraped ${allProperties.length} properties`);
-              } catch (error) {
-                log.debug(`Failed to scrape ${propertyUrl}: ${error}`);
-              }
-            }),
-          );
-
-          const failed = results.filter((r) => r.status === "rejected").length;
-          if (failed > 0) {
-            log.debug(`${failed} scrapes failed in this batch`);
-          }
-        }
-
-        currentPage++;
-      } catch (error) {
-        log.error(`Failed to scrape page ${currentPage}`, {
-          error: String(error),
-        });
-        break;
-      }
-    }
+    const crawler = this.buildCrawler();
+    await crawler.run([
+      {
+        url: this.listingUrl(SCRAPING.DEFAULT_START_PAGE),
+        label: LABELS.LIST,
+        userData: { page: SCRAPING.DEFAULT_START_PAGE },
+      },
+    ]);
+    const max = this.config.maxProperties;
+    return max && max > 0 ? this.results.slice(0, max) : this.results;
   }
 }
