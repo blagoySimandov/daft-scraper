@@ -105,6 +105,7 @@ export class CrawlerService {
       maxConcurrency: ANTI_BOT.CONCURRENCY_LIMIT,
       navigationTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
       requestHandlerTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
+      sessionPoolOptions: { blockedStatusCodes: [] },
       launchContext: {
         launchOptions: {
           headless: true,
