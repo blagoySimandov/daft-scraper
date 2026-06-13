@@ -1,4 +1,5 @@
 import { Actor, log, LogLevel } from "apify";
+import type { ProxyConfigurationOptions } from "apify";
 import { writeFileSync } from "fs";
 import { CrawlerService, DataCleanerService } from "./services";
 import type { Property } from "./models";
@@ -8,11 +9,10 @@ interface Input {
   saleOrRent: "sale" | "rent";
   maxProperties?: number;
   location?: string;
+  proxyConfiguration?: ProxyConfigurationOptions;
 }
 
 await Actor.init();
-
-const proxyConfiguration = await Actor.createProxyConfiguration();
 
 if (!Actor.isAtHome()) {
   log.setLevel(LogLevel.DEBUG);
@@ -23,6 +23,10 @@ const input = (await Actor.getInput<Input>()) || {
   saleOrRent: "rent",
   maxProperties: 20,
 };
+
+const proxyConfiguration = await Actor.createProxyConfiguration(
+  input.proxyConfiguration,
+);
 
 log.info("Starting scraper", {
   searchTerm: input.searchTerm,
