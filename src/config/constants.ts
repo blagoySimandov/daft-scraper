@@ -5,12 +5,15 @@ export const USER_AGENTS = {
 
 export const TIMEOUTS = {
   PAGE_LOAD: 60000,
+  CHALLENGE_WAIT: 10000,
   MOUSE_MOVE_DELAY: 100,
   MOUSE_MOVEMENTS: 20,
 } as const;
 
 export const ANTI_BOT = {
-  CONCURRENCY_LIMIT: 5,
+  CONCURRENCY_LIMIT: 10,
+  MAX_RETRIES: 20,
+  BLOCKED_RESOURCES: ["image", "media", "font", "stylesheet"],
 } as const;
 
 export const SCRAPING = {

@@ -47,9 +47,14 @@ export class CrawlerService {
   }
 
   private async waitForData(ctx: PuppeteerCrawlingContext): Promise<void> {
-    await ctx.page.waitForSelector(DAFT.HYDRATION_SELECTOR, {
-      timeout: TIMEOUTS.PAGE_LOAD,
-    });
+    try {
+      await ctx.page.waitForSelector(DAFT.HYDRATION_SELECTOR, {
+        timeout: TIMEOUTS.CHALLENGE_WAIT,
+      });
+    } catch {
+      ctx.session?.retire();
+      throw new Error("Cloudflare challenge not solved, rotating IP");
+    }
   }
 
   private async enqueueDetails(
@@ -99,10 +104,21 @@ export class CrawlerService {
     log.info(`Scraped ${this.results.length} properties`);
   }
 
+  private async blockHeavyResources(
+    ctx: PuppeteerCrawlingContext,
+  ): Promise<void> {
+    await ctx.page.setRequestInterception(true);
+    const blocked: readonly string[] = ANTI_BOT.BLOCKED_RESOURCES;
+    ctx.page.on("request", (req) =>
+      blocked.includes(req.resourceType()) ? req.abort() : req.continue(),
+    );
+  }
+
   private buildCrawler(): PuppeteerCrawler {
     return new PuppeteerCrawler({
       proxyConfiguration: this.config.proxyConfiguration,
       maxConcurrency: ANTI_BOT.CONCURRENCY_LIMIT,
+      maxRequestRetries: ANTI_BOT.MAX_RETRIES,
       navigationTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
       requestHandlerTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
       sessionPoolOptions: { blockedStatusCodes: [] },
@@ -112,6 +128,7 @@ export class CrawlerService {
           args: ["--no-sandbox", "--disable-setuid-sandbox"],
         },
       },
+      preNavigationHooks: [(ctx) => this.blockHeavyResources(ctx)],
       requestHandler: async (ctx) =>
         ctx.request.label === LABELS.DETAIL
           ? this.handleDetail(ctx)
