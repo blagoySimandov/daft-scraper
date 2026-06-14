@@ -5,7 +5,7 @@ export const USER_AGENTS = {
 
 export const TIMEOUTS = {
   PAGE_LOAD: 60000,
-  CHALLENGE_WAIT: 10000,
+  CHALLENGE_WAIT: 25000,
   MOUSE_MOVE_DELAY: 100,
   MOUSE_MOVEMENTS: 20,
 } as const;

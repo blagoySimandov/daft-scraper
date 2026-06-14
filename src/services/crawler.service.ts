@@ -10,6 +10,13 @@ import type { RawListing, RawListingsData, RawPropertyData } from "../models";
 
 const LABELS = { LIST: "LIST", DETAIL: "DETAIL" } as const;
 
+const hostOs = (): "macos" | "windows" | "linux" =>
+  process.platform === "darwin"
+    ? "macos"
+    : process.platform === "win32"
+      ? "windows"
+      : "linux";
+
 export interface CrawlerConfig {
   searchTerm: string;
   saleOrRent: string;
@@ -122,6 +129,15 @@ export class CrawlerService {
       navigationTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
       requestHandlerTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
       sessionPoolOptions: { blockedStatusCodes: [] },
+      browserPoolOptions: {
+        fingerprintOptions: {
+          fingerprintGeneratorOptions: {
+            browsers: ["chrome"],
+            operatingSystems: [hostOs()],
+            devices: ["desktop"],
+          },
+        },
+      },
       launchContext: {
         launchOptions: {
           headless: true,
