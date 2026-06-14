@@ -29,6 +29,7 @@ export class CrawlerService {
   private config: CrawlerConfig;
   private baseUrl: string;
   private results: RawPropertyData[] = [];
+  private enqueuedDetails = 0;
 
   constructor(config: CrawlerConfig) {
     this.config = config;
@@ -47,6 +48,12 @@ export class CrawlerService {
   private limitReached(): boolean {
     const max = this.config.maxProperties;
     return !!max && max > 0 && this.results.length >= max;
+  }
+
+  private detailBudget(): number {
+    const max = this.config.maxProperties;
+    if (!max || max <= 0) return Infinity;
+    return Math.max(0, max - this.enqueuedDetails);
   }
 
   private listingUrl(page: number): string {
@@ -68,21 +75,21 @@ export class CrawlerService {
     crawler: PuppeteerCrawlerType,
     listings: RawListing[],
   ): Promise<void> {
-    for (const listing of listings) {
-      if (this.limitReached()) return;
-      const path = listing.listing?.seoFriendlyPath;
-      if (!path) continue;
-      await crawler.addRequests([
-        { url: `${DAFT.DOMAIN}${path}`, label: LABELS.DETAIL },
-      ]);
-    }
+    const paths = listings
+      .map((l) => l.listing?.seoFriendlyPath)
+      .filter((p): p is string => !!p)
+      .slice(0, this.detailBudget());
+    this.enqueuedDetails += paths.length;
+    await crawler.addRequests(
+      paths.map((p) => ({ url: `${DAFT.DOMAIN}${p}`, label: LABELS.DETAIL })),
+    );
   }
 
   private async enqueueNextPage(
     crawler: PuppeteerCrawlerType,
     current: number,
   ): Promise<void> {
-    if (this.limitReached()) return;
+    if (this.detailBudget() <= 0) return;
     const next = current + 1;
     await crawler.addRequests([
       {
@@ -109,6 +116,7 @@ export class CrawlerService {
     await this.waitForData(ctx);
     this.results.push(parseHydrationData(await ctx.page.content()));
     log.info(`Scraped ${this.results.length} properties`);
+    if (this.limitReached()) await ctx.crawler.stop();
   }
 
   private async blockHeavyResources(
@@ -153,16 +161,9 @@ export class CrawlerService {
     });
   }
 
-  private warmupCount(): number {
-    const max = this.config.maxProperties;
-    if (!max || max <= 0) return SCRAPING.WARMUP_PAGES;
-    const needed = Math.ceil(max / SCRAPING.LISTINGS_PER_PAGE);
-    return Math.min(SCRAPING.WARMUP_PAGES, Math.max(1, needed));
-  }
-
   private warmupRequests() {
     const start = SCRAPING.DEFAULT_START_PAGE;
-    return Array.from({ length: this.warmupCount() }, (_, i) => ({
+    return Array.from({ length: SCRAPING.WARMUP_PAGES }, (_, i) => ({
       url: this.listingUrl(start + i),
       label: LABELS.LIST,
       userData: { page: start + i },
@@ -171,6 +172,7 @@ export class CrawlerService {
 
   async scrapeAllProperties(): Promise<RawPropertyData[]> {
     this.results = [];
+    this.enqueuedDetails = 0;
     log.info(`Starting scrape from: ${this.baseUrl}`);
     const crawler = this.buildCrawler();
     await crawler.run(this.warmupRequests());
