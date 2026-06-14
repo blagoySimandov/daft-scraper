@@ -4,6 +4,8 @@
   "title": "Daft.ie Property Scraper",
   "description": "Scrapes property listings from Daft.ie based on search terms. Handles Cloudflare protection and extracts detailed property information including prices, locations, amenities, and media.",
   "version": "1.0",
+  "minMemoryMbytes": 4096,
+  "maxMemoryMbytes": 8192,
   "meta": {
     "templateId": "typescript"
   },

@@ -11,7 +11,7 @@ export const TIMEOUTS = {
 } as const;
 
 export const ANTI_BOT = {
-  CONCURRENCY_LIMIT: 10,
+  CONCURRENCY_LIMIT: 4,
   MAX_RETRIES: 20,
   BLOCKED_RESOURCES: ["image", "media", "font", "stylesheet"],
 } as const;
