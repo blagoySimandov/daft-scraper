@@ -128,6 +128,7 @@ export class CrawlerService {
       maxRequestRetries: ANTI_BOT.MAX_RETRIES,
       navigationTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
       requestHandlerTimeoutSecs: TIMEOUTS.PAGE_LOAD / 1000,
+      persistCookiesPerSession: true,
       sessionPoolOptions: { blockedStatusCodes: [] },
       browserPoolOptions: {
         fingerprintOptions: {
@@ -152,17 +153,27 @@ export class CrawlerService {
     });
   }
 
+  private warmupCount(): number {
+    const max = this.config.maxProperties;
+    if (!max || max <= 0) return SCRAPING.WARMUP_PAGES;
+    const needed = Math.ceil(max / SCRAPING.LISTINGS_PER_PAGE);
+    return Math.min(SCRAPING.WARMUP_PAGES, Math.max(1, needed));
+  }
+
+  private warmupRequests() {
+    const start = SCRAPING.DEFAULT_START_PAGE;
+    return Array.from({ length: this.warmupCount() }, (_, i) => ({
+      url: this.listingUrl(start + i),
+      label: LABELS.LIST,
+      userData: { page: start + i },
+    }));
+  }
+
   async scrapeAllProperties(): Promise<RawPropertyData[]> {
     this.results = [];
     log.info(`Starting scrape from: ${this.baseUrl}`);
     const crawler = this.buildCrawler();
-    await crawler.run([
-      {
-        url: this.listingUrl(SCRAPING.DEFAULT_START_PAGE),
-        label: LABELS.LIST,
-        userData: { page: SCRAPING.DEFAULT_START_PAGE },
-      },
-    ]);
+    await crawler.run(this.warmupRequests());
     const max = this.config.maxProperties;
     return max && max > 0 ? this.results.slice(0, max) : this.results;
   }

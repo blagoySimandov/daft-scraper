@@ -20,6 +20,8 @@ export const SCRAPING = {
   DEFAULT_DELAY_MS: 500,
   DEFAULT_START_PAGE: 1,
   DEFAULT_END_PAGE: 24,
+  WARMUP_PAGES: 5,
+  LISTINGS_PER_PAGE: 20,
 } as const;
 
 export const DAFT = {
