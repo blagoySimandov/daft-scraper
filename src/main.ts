@@ -25,7 +25,11 @@ const input = (await Actor.getInput<Input>()) || {
 };
 
 const proxyConfiguration = await Actor.createProxyConfiguration(
-  input.proxyConfiguration,
+  input.proxyConfiguration ?? {
+    useApifyProxy: true,
+    apifyProxyGroups: ["RESIDENTIAL"],
+    apifyProxyCountry: "IE",
+  },
 );
 
 log.info("Starting scraper", {

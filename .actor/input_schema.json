@@ -37,7 +37,11 @@
       "type": "object",
       "description": "Proxy used to reach Daft.ie. Datacenter works for low volume; residential (with country Ireland) is more reliable against Cloudflare but billed per GB. Billed to the account running the actor.",
       "editor": "proxy",
-      "default": { "useApifyProxy": true }
+      "default": {
+        "useApifyProxy": true,
+        "apifyProxyGroups": ["RESIDENTIAL"],
+        "apifyProxyCountry": "IE"
+      }
     }
   },
   "required": ["searchTerm", "saleOrRent"]
